@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 launcher banner: black with three columns of falling green code. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <path android:fillColor="#000000" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#1A6B35" android:pathData="M60,0h8v18h-8zM60,26h8v18h-8zM60,52h8v18h-8z" />
+    <path android:fillColor="#3DF56E" android:pathData="M60,78h8v18h-8z" />
+    <path android:fillColor="#1A6B35" android:pathData="M156,20h8v18h-8zM156,46h8v18h-8zM156,72h8v18h-8zM156,98h8v18h-8z" />
+    <path android:fillColor="#3DF56E" android:pathData="M156,124h8v18h-8z" />
+    <path android:fillColor="#1A6B35" android:pathData="M252,0h8v18h-8zM252,26h8v18h-8z" />
+    <path android:fillColor="#3DF56E" android:pathData="M252,52h8v18h-8z" />
+    <path android:fillColor="#E8FFEE" android:pathData="M60,104h8v18h-8zM156,150h8v18h-8zM252,78h8v18h-8z" />
+</vector>
