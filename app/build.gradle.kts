@@ -40,7 +40,7 @@ android {
         resources.excludes += setOf("META-INF/*.version", "META-INF/*.kotlin_module", "kotlin/**", "DebugProbesKt.bin")
     }
     androidResources {
-        noCompress += "jpg" // wallpapers are already JPEG; storing them avoids a second inflate on decode
+        noCompress += "webp" // wallpapers are already WebP; storing them avoids a second inflate on decode
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

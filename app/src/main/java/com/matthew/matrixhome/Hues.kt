@@ -33,7 +33,7 @@ object Hues {
     fun byId(id: String?) = all.firstOrNull { it.id == id } ?: default
 }
 
-/** The six wallpaper scenes, the same in every hue (assets/wallpapers/<hue>/<scene>.jpg). */
+/** The six wallpaper scenes, the same in every hue (assets/wallpapers/<hue>/<scene>.webp). */
 object Scenes {
     val all = listOf("cascade", "depth", "tunnel", "floor", "scan", "wet-glass")
 
@@ -44,7 +44,7 @@ object Scenes {
      * 1920x1080 sRGB, so there's no scaling or colour conversion, and no texture upload per frame.
      */
     fun load(context: Context, hue: Hue, scene: String): Bitmap? = runCatching {
-        context.assets.open("wallpapers/${hue.id}/$scene.jpg").use { input ->
+        context.assets.open("wallpapers/${hue.id}/$scene.webp").use { input ->
             BitmapFactory.decodeStream(input, null, BitmapFactory.Options().apply {
                 inPreferredConfig = Bitmap.Config.HARDWARE
                 inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)

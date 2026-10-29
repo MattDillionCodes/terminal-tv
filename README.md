@@ -103,7 +103,7 @@ numerals and a few symbols.
 | `Weather.kt` | Open-Meteo forecast and city lookup |
 | `Help.kt` | The `man terminal` help page |
 
-The wallpapers (`app/src/main/assets/wallpapers/<colour>/<scene>.jpg`, 1920x1080 sRGB) decode
+The wallpapers (`app/src/main/assets/wallpapers/<colour>/<scene>.webp`, 1920x1080 sRGB, WebP quality 88) decode
 straight into GPU bitmaps. Swap in your own by keeping those names.
 
 Release builds are signed with your local debug key, so they install with no setup. Use your own
