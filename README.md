@@ -1,7 +1,7 @@
-# Matrix Home
+# Terminal
 
-A home screen (launcher) for Android TV and Google TV, styled as a clean Matrix terminal:
-monospace text on black, a typed prompt, inverse-video selection, film-style digital rain, and no
+A home screen (launcher) for Android TV and Google TV, styled as a clean retro computer terminal:
+monospace text on black, a typed prompt, inverse-video selection, digital rain, and no
 app icons anywhere. Seven colours re-light the whole screen. Kotlin, no dependencies, views built
 in code.
 
@@ -12,13 +12,13 @@ in code.
 You need Android Studio (for the SDK and its bundled JDK) and an Android TV device or emulator
 running Android 10 (API 29) or later.
 
-**On an emulator.** Create an Android TV (1080p) virtual device named `Matrix_TV`, then:
+**On an emulator.** Create an Android TV (1080p) virtual device named `Terminal_TV`, then:
 
 ```bash
 ./run.sh
 ```
 
-It boots that emulator if needed, builds, installs, and makes Matrix the Home app. Use
+It boots that emulator if needed, builds, installs, and makes Terminal the Home app. Use
 `AVD=<name> ./run.sh` for a device with another name. Your keyboard is the remote (arrows, Enter
 for OK, Esc for Back) only if the AVD's `config.ini` has `hw.keyboard=yes`; Android Studio
 creates TV devices with `no`.
@@ -30,18 +30,18 @@ creates TV devices with `no`.
 ```
 
 It installs a release build and opens it, but leaves your TV's Home app as it was. To make
-Matrix your home screen, pick it when the TV asks which home app to use, or run
-`adb shell cmd package set-home-activity com.matthew.matrixhome/.HomeActivity`. Pressing Home
-then opens Matrix.
+Terminal your home screen, pick it when the TV asks which home app to use, or run
+`adb shell cmd package set-home-activity io.github.mattdillioncodes.terminal/com.matthew.matrixhome.HomeActivity`. Pressing Home
+then opens Terminal.
 
 ## Using it
 
 ```
-MATRIX  tty1                                  67°F cloudy   9:44 PM  WED 28 OCT
+TERMINAL  tty1                                67°F cloudy   9:44 PM  WED 28 OCT
 ────────────────────────────────────────────────────────────────────────────────
 Last login: Wed Oct 28 22:03:12 on tty1
-Wake up, Neo...
-matrix@tv:~/apps$ open "play store"█ # com.android.vending
+Welcome back, friend.
+guest@tv:~/apps$ open "play store"█ # com.android.vending
 
                                          ┌ ~/apps ─────────────── 3 ┐
                                          │   netflix                 │
@@ -60,9 +60,9 @@ matrix@tv:~/apps$ open "play store"█ # com.android.vending
   what the two commands share, then types the rest. **OK** runs the command. **Hold OK** adds or
   removes a favourite. **Back** closes a menu.
 - **The key bar** along the bottom always says what the buttons do right now.
-- **Help** (`man matrix`) opens by itself on first launch, and from `system/ > help` after that.
+- **Help** (`man terminal`) opens by itself on first launch, and from `system/ > help` after that.
 - **Name** (`system/ > name`) sets the prompt's user and the greeting. For example, typing
-  `Ada` makes the prompt `ada@tv` and the greeting "Wake up, Ada...".
+  `Ada` makes the prompt `ada@tv` and the greeting "Welcome back, Ada."
 - **Weather** (`system/ > weather`): type a city name. It's looked up with
   [Open-Meteo](https://open-meteo.com) (free, no API key) and shown in the status line in words:
   `18°C rain`. Places in the US and a few other countries show °F. Until you set a city, no
@@ -101,7 +101,7 @@ numerals and a few symbols.
 | `Rain.kt`, `Glyphs.kt` | Digital rain and its glyph atlases |
 | `Hues.kt` | The seven colours and the wallpaper scenes |
 | `Weather.kt` | Open-Meteo forecast and city lookup |
-| `Help.kt` | The `man matrix` help page |
+| `Help.kt` | The `man terminal` help page |
 
 The wallpapers (`app/src/main/assets/wallpapers/<colour>/<scene>.jpg`, 1920x1080 sRGB) decode
 straight into GPU bitmaps. Swap in your own by keeping those names.
@@ -113,4 +113,4 @@ signing key before giving the APK to anyone.
 
 MIT, see [LICENSE](LICENSE). The wallpapers are by the author and covered by the same license.
 
-A fan project. It isn't affiliated with or endorsed by Warner Bros. or the makers of *The Matrix*.
+An original project by Matt Dillion Shoots. Inspired by classic computer terminals.

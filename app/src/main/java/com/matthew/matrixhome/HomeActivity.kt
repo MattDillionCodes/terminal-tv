@@ -43,7 +43,7 @@ import java.util.Date
 import java.util.concurrent.Executors
 
 /**
- * Matrix home, styled as a clean terminal. A status line on top, then a live shell session
+ * Terminal home, styled as a clean retro terminal. A status line on top, then a live shell session
  * ([Terminal]): selecting an entry types its command at the prompt (`open youtube`), and OK runs
  * it, printing output before it acts. At the bottom, one line of text:
  *   youtube   cast moderator   play store   |   apps/   system/
@@ -119,8 +119,8 @@ class HomeActivity : Activity() {
         const val COLOR_INDEX = 5
         const val NAME_MAX = 16
         const val CITY_MAX = 40
-        const val DEFAULT_USER = "matrix"
-        const val DEFAULT_GREETING_NAME = "Neo"
+        const val DEFAULT_USER = "guest"
+        const val DEFAULT_GREETING_NAME = "friend"
         const val WEATHER_EVERY_MS = 15 * 60 * 1000L
         const val RUN_MS = 350L // output stays on screen this long before the command acts (opens an app...)
         const val ROTATE_EVERY_MS = 60 * 1000L
@@ -130,7 +130,7 @@ class HomeActivity : Activity() {
         const val PREVIEW_DIM = 0.35f // while choosing a wallpaper: bright enough to see what changed
         const val MANUAL_FADE_MS = 600L // a change you asked for cross-fades quickly; the automatic ones take 1.5 s
 
-        /** The first film's opening terminal, one line typed per visit to Home; %s is the user's name (or Neo). */
+        /** Greeting lines, one typed per visit to Home; %s is the user's name (or "friend"). */
         /** Volume and media keys: never swallowed, so the TV's volume works over ambient and help too. */
         val SYSTEM_KEYS = setOf(
             KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE, KeyEvent.KEYCODE_MUTE,
@@ -139,7 +139,7 @@ class HomeActivity : Activity() {
             KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
         )
 
-        val MOTD = listOf("Wake up, %s...", "The Matrix has you...", "Follow the white rabbit.", "Knock, knock, %s.")
+        val MOTD = listOf("Welcome back, %s.", "All systems nominal.", "Signal acquired.", "Ready when you are, %s.")
     }
 
     /**
@@ -162,7 +162,7 @@ class HomeActivity : Activity() {
         "com.google.android.youtube.tvunplugged",
     )
 
-    private val prefs by lazy { getSharedPreferences("matrix", MODE_PRIVATE) }
+    private val prefs by lazy { getSharedPreferences("terminal", MODE_PRIVATE) }
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
     private fun dpf(v: Int) = v * resources.displayMetrics.density
 
@@ -203,9 +203,9 @@ class HomeActivity : Activity() {
     /** A 1dp rule in the hue at low strength: the only "chrome" on screen. */
     private fun hairline() = View(this).also { v -> tint { v.setBackgroundColor(it.dim) } }
 
-    /** Top: `MATRIX  tty1 ........ 64°F clear   9:28 PM  WED 28 OCT`, then a rule. */
+    /** Top: `TERMINAL  tty1 ........ 64°F clear   9:28 PM  WED 28 OCT`, then a rule. */
     private fun buildStatus() {
-        val brand = text(12f, monoBold).apply { text = "MATRIX"; letterSpacing = 0.3f }
+        val brand = text(12f, monoBold).apply { text = "TERMINAL"; letterSpacing = 0.3f }
         weatherView = text(12f, color = DIM_WHITE).apply { setPadding(0, 0, dp(18), 0) } // empty until the first reading
         clock = text(12f, color = Color.WHITE)
         date = text(12f).apply { setPadding(dp(14), 0, 0, 0) }
@@ -450,7 +450,7 @@ class HomeActivity : Activity() {
                 }
             }
         return listOf(
-            item("help", "man matrix", { "how to use this screen and the remote" }, "OK" to "show") {
+            item("help", "man terminal", { "how to use this screen and the remote" }, "OK" to "show") {
                 execute(null) { closeMenu(); showHelp() }
             },
             item("settings", "open settings", { "android settings" }, "OK" to "open") {
@@ -484,19 +484,19 @@ class HomeActivity : Activity() {
     private fun savedName() = prefs.getString("name", null)
 
     /**
-     * The prompt's user: a name as a Unix login (`Ada L` -> `ada-l`, `José` -> `jose`), or `matrix`
+     * The prompt's user: a name as a Unix login (`Ada L` -> `ada-l`, `José` -> `jose`), or `guest`
      * when nothing's left. Accents are dropped rather than the letters they sit on.
      */
     private fun loginFor(name: String?) =
         Normalizer.normalize(name.orEmpty(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
             .lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { DEFAULT_USER }
 
-    /** Who the greeting talks to: the saved name as typed (first letter capitalised), or Neo. */
+    /** Who the greeting talks to: the saved name as typed (first letter capitalised), or "friend". */
     private fun greetingName() = savedName()?.replaceFirstChar { it.uppercase() } ?: DEFAULT_GREETING_NAME
 
     /**
      * system/ > name: as you type, the terminal types the rename it's about to run
-     * (`usermod -l ada matrix`, the real Linux command) and the line under the field previews the prompt.
+     * (`usermod -l ada guest`, the real Linux command) and the line under the field previews the prompt.
      */
     private fun openNameEditor() {
         val old = loginFor(savedName())

@@ -16,10 +16,10 @@
     </queries>
 
     <application
-        android:label="Matrix"
+        android:label="Terminal"
         android:icon="@drawable/banner"
         android:banner="@drawable/banner"
-        android:theme="@style/Matrix"
+        android:theme="@style/Terminal"
         android:supportsRtl="true">
 
         <activity

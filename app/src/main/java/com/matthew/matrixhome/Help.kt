@@ -28,7 +28,7 @@ class HelpView(context: Context, private val hue: Hue) : FrameLayout(context) {
 
     init {
         setBackgroundColor(Color.argb(242, 0, 0, 0))
-        line("$ man matrix", 13f, hue.color)
+        line("$ man terminal", 13f, hue.color)
         line("How to use your TV", 30f, Color.WHITE, top = 6).setShadowLayer(8 * dp, 0f, 0f, withAlpha(hue.color, 200))
 
         gap(22)

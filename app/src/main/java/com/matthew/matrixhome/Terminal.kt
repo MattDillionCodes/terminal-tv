@@ -13,7 +13,7 @@ import kotlin.random.Random
 
 /**
  * The shell session at the top of Home, behaving like a real terminal: a scrollback of printed
- * lines, then a prompt (`matrix@tv:~/favorites$ `) where the command for whatever's focused is
+ * lines, then a prompt (`guest@tv:~/favorites$ `) where the command for whatever's focused is
  * typed out. Moving focus edits that command the way a person would: backspace to the part both
  * commands share, then type the rest. Once it's typed, the target's details show greyed out after
  * the cursor, like a shell's autosuggestion. [run] executes it: the command and its output scroll
@@ -23,8 +23,8 @@ class Terminal(private val view: TextView, private val rows: Int) {
     var hue: Hue = Hues.default
         set(value) { field = value; render() }
 
-    /** Whose prompt it is (`matrix@tv`). Lines already printed keep the user who ran them, as in a real shell. */
-    var user = "matrix"
+    /** Whose prompt it is (`guest@tv`). Lines already printed keep the user who ran them, as in a real shell. */
+    var user = "guest"
         set(value) { field = value; render() }
 
     private enum class Kind { DIM, HUE, COMMAND, OUTPUT }
@@ -162,7 +162,7 @@ class Terminal(private val view: TextView, private val rows: Int) {
         Kind.COMMAND -> promptFor(line.dir, line.user).append(colored(line.text, Color.WHITE))
     }
 
-    /** `matrix@tv:~/apps$ `: user and path in the hue, punctuation in white, the way a coloured shell prompt looks. */
+    /** `guest@tv:~/apps$ `: user and path in the hue, punctuation in white, the way a coloured shell prompt looks. */
     private fun promptFor(cwd: String, who: String = user) = SpannableStringBuilder()
         .append(colored("$who@tv", hue.color, bold = true))
         .append(colored(":", Color.WHITE))

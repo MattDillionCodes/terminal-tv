@@ -8,7 +8,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.matthew.matrixhome"
+        applicationId = "io.github.mattdillioncodes.terminal"
         minSdk = 29 // Android TV 10: EditText.textCursorDrawable (the editor's block cursor) needs 29
         targetSdk = 35
         versionCode = 1

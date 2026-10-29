@@ -59,7 +59,7 @@ class Weather(private val temp: Int, private val code: Int, private val fahrenhe
             val body = (URL(url).openConnection() as HttpURLConnection).run {
                 connectTimeout = 8000
                 readTimeout = 8000
-                setRequestProperty("User-Agent", "MatrixHome")
+                setRequestProperty("User-Agent", "TerminalTV")
                 try { inputStream.use { String(it.readBytes()) } } finally { disconnect() }
             }
             return JSONObject(body)

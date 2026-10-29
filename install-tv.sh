@@ -1,9 +1,9 @@
 #!/bin/zsh
-# Build Matrix (R8-shrunk release), install it on a TV over adb and open it.
+# Build Terminal (R8-shrunk release), install it on a TV over adb and open it.
 # It's installed as an app you open, not made the TV's Home: installing a second Home app can clear
 # the TV's saved Home choice (leaving a "choose a home app" picker), so whatever Home the TV had
-# before is put back afterwards. To make Matrix the Home app, choose it in that picker or run
-#   adb shell cmd package set-home-activity com.matthew.matrixhome/.HomeActivity
+# before is put back afterwards. To make Terminal the Home app, choose it in that picker or run
+#   adb shell cmd package set-home-activity io.github.mattdillioncodes.terminal/com.matthew.matrixhome.HomeActivity
 # Usage: ./install-tv.sh 192.168.1.20      (or TV=ip[:port]; enable ADB debugging on the TV first)
 set -e
 TV=${1:-$TV}
@@ -26,4 +26,4 @@ case "$before" in
   */*) $ADB shell cmd package set-home-activity "$before" >/dev/null ;;
 esac
 echo "Home: $(home)"
-$ADB shell am start -n com.matthew.matrixhome/.HomeActivity >/dev/null
+$ADB shell am start -n io.github.mattdillioncodes.terminal/com.matthew.matrixhome.HomeActivity >/dev/null
