@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId = "com.matthew.matrixhome"
-        minSdk = 31 // QM5K runs Android TV 12 (API 31)
+        minSdk = 29 // Android TV 10: EditText.textCursorDrawable (the editor's block cursor) needs 29
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
@@ -20,6 +20,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Signed with the local debug key so `assembleRelease` installs without setup. Fine for
+            // sideloading your own TV; use your own key before handing the APK to anyone else.
             signingConfig = signingConfigs.getByName("debug")
         }
     }

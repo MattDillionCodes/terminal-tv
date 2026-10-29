@@ -23,13 +23,13 @@ val DIM_WHITE = Color.argb(140, 255, 255, 255)
 /**
  * One selectable entry, the way a terminal shows a menu: plain monospace text in the hue, and when
  * focused, inverse video (a solid block of the colour with black text). No boxes, art or motion;
- * focus changes instantly, like a cursor. [ink] overrides the hue (the colour entries are written
- * in their own colour). With [pointer] (the pop-up menus) the focused line gets a triangle left of
+ * focus changes instantly, like a cursor. With [pointer] (the pop-up menus) the focused line gets a triangle left of
  * its text, like a menu cursor; every line keeps the space for it, so text never shifts as it moves.
  */
-class TermItem(context: Context, hue: Hue, text: String, sizeSp: Float, private val ink: Int = hue.color,
+class TermItem(context: Context, hue: Hue, text: String, sizeSp: Float,
                private val pointer: Boolean = false) : TextView(context) {
     private val dp = resources.displayMetrics.density
+    private val ink = hue.color
     // Named ink, not color: inside GradientDrawable().apply {} a bare `color` is the drawable's own
     // getColor() (null here), which silently left the focus block unfilled.
     private val block = GradientDrawable().apply { cornerRadius = 2 * dp; setColor(ink) }

@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Build Matrix Home and run it on its own Android TV emulator as the Home app (never touches the TV).
+# Build Matrix Home and run it on an Android TV emulator as the Home app (never touches a real TV).
 # Finds the emulator by AVD name, not "the first one", since other launchers' emulators may be up too.
 # Usage: ./run.sh            (AVD=name picks a different emulator)
 set -e
@@ -25,8 +25,8 @@ export ANDROID_SERIAL=$serial
 
 ./gradlew assembleDebug --console=plain -q
 $ADB install -r app/build/outputs/apk/debug/app-debug.apk
-# The stock launcher declares a higher HOME priority and can win even after set-home-activity;
-# the TV has it disabled too, so match that here.
+# The stock Google TV launcher declares a higher HOME priority and can win even after
+# set-home-activity, so it's disabled on the emulator (re-enable: pm enable com.google.android.tvlauncher).
 $ADB shell pm disable-user --user 0 com.google.android.tvlauncher >/dev/null 2>&1 || true
 $ADB shell cmd package set-home-activity com.matthew.matrixhome/.HomeActivity
 $ADB shell input keyevent KEYCODE_HOME

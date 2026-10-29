@@ -40,7 +40,7 @@ class HelpView(context: Context, private val hue: Hue) : FrameLayout(context) {
         gap(22)
         row(path("favorites"), "your main apps, first on the line (up to five)")
         row(path("apps/"), "a pop-up menu of every app on the TV")
-        row(path("system/"), "help, settings, your name, wallpaper, colour, screensaver")
+        row(path("system/"), "help, settings, your name, weather, wallpaper, colour, screensaver")
 
         gap(22)
         line("The bottom line always shows what the buttons do.", 13f, DIM_WHITE)

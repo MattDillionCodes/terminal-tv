@@ -9,6 +9,7 @@ import android.content.IntentFilter
 import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.graphics.Typeface
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.SystemClock
@@ -37,6 +38,7 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import java.text.Normalizer
 import java.util.Date
 import java.util.concurrent.Executors
 
@@ -47,16 +49,18 @@ import java.util.concurrent.Executors
  *   youtube   cast moderator   play store   |   apps/   system/
  * Favourites first (up to five; hold OK to remove one), then two folders that open a pop-up menu
  * ([MenuView]): apps/ lists every TV app (hold OK to add or remove a favourite), system/ has help,
- * settings, name, wallpaper, color and ambient. The focused entry is in inverse video and the key
- * bar along the bottom says what the buttons do. `name` renames the prompt's user and the greeting
- * (`matthew@tv`, "Wake up, Matthew..."); the status line carries the weather ([Weather]).
+ * settings, name, weather, wallpaper, color and ambient. The focused entry is in inverse video and
+ * the key bar along the bottom says what the buttons do. `name` renames the prompt's user and the
+ * greeting (`ada@tv`, "Wake up, Ada..."); `weather` sets the city the status line reports ([Weather]).
  * First launch opens the help screen ([HelpView]) once; system/ > help reopens it.
  * The wallpaper sits dimmed far behind; the rain plays only on cold start and in ambient mode.
  * Layout is on the 960x540dp canvas of a 1080p TV (1dp = 2px), with 48dp side margins.
  */
 class HomeActivity : Activity() {
     /** No icons or banners anywhere: an app is its name and package, printed as text. */
-    private class App(val info: ActivityInfo, val label: String)
+    private class App(val info: ActivityInfo, val label: String) {
+        val key get() = "${info.packageName}/${info.name}:$label"
+    }
 
     private enum class Folder { APPS, SYSTEM }
 
@@ -84,6 +88,7 @@ class HomeActivity : Activity() {
     private fun tint(block: (Hue) -> Unit) { tinters += block }
 
     private var allApps: List<App> = emptyList()
+    private var appsLoaded = false
     private var hue = Hues.default
     private var sceneIndex = 0
     private var inAmbient = false
@@ -91,7 +96,7 @@ class HomeActivity : Activity() {
     private var menu: MenuView? = null // non-null while a pop-up menu is open
     private var menuFolder: Folder? = null
     private val menuLefts = HashMap<Folder, Int>()
-    private var editingName = false // the name editor is up (Back returns to the system/ menu)
+    private var editing: Int? = null // a system/ editor (name, weather) is up; Back returns to this entry
     private var swallowKeyUp = false
     private val loader = Executors.newSingleThreadExecutor()
     private val net = Executors.newSingleThreadExecutor() // its own thread: a slow request never holds up a wallpaper
@@ -109,9 +114,11 @@ class HomeActivity : Activity() {
         const val LINE_H = 40
         const val MENU_W = 400
         const val MENU_ROWS = 6 // the menu fits between the line and the terminal; longer lists scroll
-        const val NAME_INDEX = 2 // positions in the system/ menu, refocused after a rename or a colour change
-        const val COLOR_INDEX = 4
+        const val NAME_INDEX = 2 // positions in the system/ menu, refocused after an edit or a colour change
+        const val WEATHER_INDEX = 3
+        const val COLOR_INDEX = 5
         const val NAME_MAX = 16
+        const val CITY_MAX = 40
         const val DEFAULT_USER = "matrix"
         const val DEFAULT_GREETING_NAME = "Neo"
         const val WEATHER_EVERY_MS = 15 * 60 * 1000L
@@ -124,27 +131,35 @@ class HomeActivity : Activity() {
         const val MANUAL_FADE_MS = 600L // a change you asked for cross-fades quickly; the automatic ones take 1.5 s
 
         /** The first film's opening terminal, one line typed per visit to Home; %s is the user's name (or Neo). */
+        /** Volume and media keys: never swallowed, so the TV's volume works over ambient and help too. */
+        val SYSTEM_KEYS = setOf(
+            KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE, KeyEvent.KEYCODE_MUTE,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY, KeyEvent.KEYCODE_MEDIA_PAUSE,
+            KeyEvent.KEYCODE_MEDIA_STOP, KeyEvent.KEYCODE_MEDIA_NEXT, KeyEvent.KEYCODE_MEDIA_PREVIOUS,
+            KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_FAST_FORWARD,
+        )
+
         val MOTD = listOf("Wake up, %s...", "The Matrix has you...", "Follow the white rabbit.", "Knock, knock, %s.")
     }
 
     /**
-     * Kept out of apps/, as in Glass: Settings has its own entry under system/, and the TCL system
-     * screens aren't apps you'd open from here. Unlike Glass, `com.tcl.tv` (live TV / HDMI inputs)
-     * stays listed: Glass reaches inputs from its Control Center, Matrix has only apps/ > tv.
+     * Kept out of apps/: Settings has its own entry under system/, and some TVs list system screens
+     * that aren't apps you'd open from here (TCL's quick panel and its own home). Live TV / HDMI
+     * inputs stay listed (`com.tcl.tv` on TCL), since apps/ is the only way there.
      */
     private val hiddenApps = setOf(
         "com.android.tv.settings", // Settings
-        "com.tcl.suspension",      // Quick panel
-        "com.tcl.dashboard",       // TCL HOME
+        "com.tcl.suspension",      // TCL quick panel
+        "com.tcl.dashboard",       // TCL home
     )
 
-    /** Favourites until you change them (the same as Glass's dock); any free slots fill from apps/. */
+    /** Favourites until you change them, if they're installed; any free slots fill from apps/. */
     private val favoriteDefaults = listOf(
         "com.google.android.youtube.tv",
+        "com.netflix.ninja",
+        "com.amazon.amazonvideo.livingroom",
+        "com.disney.disneyplus",
         "com.google.android.youtube.tvunplugged",
-        "com.nuvio.tv",
-        "tv.twitch.android.app",
-        "com.wbd.stream",
     )
 
     private val prefs by lazy { getSharedPreferences("matrix", MODE_PRIVATE) }
@@ -174,7 +189,6 @@ class HomeActivity : Activity() {
         tinters.forEach { it(hue) }
         rain.hue = hue
         terminal.user = loginFor(savedName())
-        loadApps()
         intro()
     }
 
@@ -288,7 +302,7 @@ class HomeActivity : Activity() {
             LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { setMargins(dp(14), 0, dp(14), 0) })
 
         appsEntry = folder("apps/", { "${allApps.size} apps · OK to browse" }) { openMenu(Folder.APPS) }
-        systemEntry = folder("system/", { "help settings name wallpaper color ambient" }) { openMenu(Folder.SYSTEM) }
+        systemEntry = folder("system/", { "help settings name weather wallpaper color ambient" }) { openMenu(Folder.SYSTEM) }
 
         root.post {
             if (menu != null) return@post // the open menu keeps focus; the line stays blocked behind it
@@ -300,7 +314,7 @@ class HomeActivity : Activity() {
     private fun favoriteEntry(app: App) = TermItem(this, hue, app.label.lowercase(), 16f).apply {
         maxWidth = dp(190) // ~16 characters; longer names end in an ellipsis
         val keys = listOf("OK" to "open", "HOLD OK" to "remove from favorites", "◀ ▶" to "move")
-        setOnClickListener { execute("launching ${app.info.packageName}") { launch(app.info) } }
+        setOnClickListener { execute("launching ${app.info.packageName}") { launch(app, "~/favorites") } }
         setOnLongClickListener { togglePin(app, fromMenu = false, entry = this); true }
         onFocus { f -> setFocusedLook(f); if (f) describe("~/favorites", "open ${arg(app.label)}", { app.info.packageName }, keys) }
     }
@@ -396,10 +410,10 @@ class HomeActivity : Activity() {
     private fun closeMenu(restoreFocus: Boolean = true, animate: Boolean = true) {
         val v = menu ?: return
         val opener = if (menuFolder == Folder.APPS) appsEntry else systemEntry
-        if (editingName) getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(v.windowToken, 0)
+        if (editing != null) getSystemService(InputMethodManager::class.java).hideSoftInputFromWindow(v.windowToken, 0)
         menu = null
         menuFolder = null
-        editingName = false
+        editing = null
         previewWallpaper(false) // never leave the wallpaper bright behind a closed menu
         if (animate) v.animate().alpha(0f).setDuration(120).withEndAction { root.removeView(v) }.start() else root.removeView(v)
         if (restoreFocus) {
@@ -416,7 +430,7 @@ class HomeActivity : Activity() {
             TermItem(this, hue, (if (fav) "* " else "  ") + app.label.lowercase(), 14f, pointer = true).apply {
                 val keys = listOf("OK" to "open", "HOLD OK" to if (fav) "remove from favorites" else "add to favorites",
                     "BACK" to "close")
-                setOnClickListener { execute("launching ${app.info.packageName}") { closeMenu(); launch(app.info) } }
+                setOnClickListener { execute("launching ${app.info.packageName}") { closeMenu(); launch(app, "~/apps") } }
                 setOnLongClickListener { togglePin(app, fromMenu = true, entry = this); true }
                 onFocus { f -> setFocusedLook(f); if (f) describe("~/apps", "open ${arg(app.label)}", { app.info.packageName }, keys) }
             }
@@ -446,6 +460,11 @@ class HomeActivity : Activity() {
                 terminal.run(loginFor(savedName())) // whoami prints who you are, then the editor opens
                 openNameEditor()
             },
+            item("weather", "weather", { savedPlace()?.let { "${it.name} · OK to change" } ?: "no city set · OK to set one" },
+                "OK" to "set city") {
+                terminal.run(savedPlace()?.let { p -> listOfNotNull(p.name, weather?.toString()).joinToString(": ") } ?: "weather: no city set")
+                openCityEditor()
+            },
             // While the cursor is on `wallpaper` the dimming lifts, so each change is actually visible.
             item("wallpaper", "wallpaper --next", { "now: ${sceneName(sceneIndex)}" }, "OK" to "next wallpaper",
                 focused = { previewWallpaper(it) }) {
@@ -464,72 +483,28 @@ class HomeActivity : Activity() {
 
     private fun savedName() = prefs.getString("name", null)
 
-    /** The prompt's user: a name as a Unix login (`Matthew D` -> `matthew-d`), or `matrix` when there's none. */
+    /**
+     * The prompt's user: a name as a Unix login (`Ada L` -> `ada-l`, `José` -> `jose`), or `matrix`
+     * when nothing's left. Accents are dropped rather than the letters they sit on.
+     */
     private fun loginFor(name: String?) =
-        name.orEmpty().lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { DEFAULT_USER }
+        Normalizer.normalize(name.orEmpty(), Normalizer.Form.NFD).replace(Regex("\\p{M}+"), "")
+            .lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').ifEmpty { DEFAULT_USER }
 
     /** Who the greeting talks to: the saved name as typed (first letter capitalised), or Neo. */
     private fun greetingName() = savedName()?.replaceFirstChar { it.uppercase() } ?: DEFAULT_GREETING_NAME
 
     /**
-     * system/ > name: a one-line editor in the menu's place. As you type, the terminal types the
-     * rename it's about to run (`usermod -l matthew matrix`, the real Linux command) and the line
-     * under the field previews the prompt. Done (or Enter) saves; Back goes back to the menu.
+     * system/ > name: as you type, the terminal types the rename it's about to run
+     * (`usermod -l ada matrix`, the real Linux command) and the line under the field previews the prompt.
      */
     private fun openNameEditor() {
         val old = loginFor(savedName())
-        val preview = text(12f, color = DIM_WHITE).apply {
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), 0, dp(12), 0)
-        }
-        val field = EditText(this).apply {
-            typeface = mono
-            textSize = 14f
-            setTextColor(Color.WHITE)
-            background = null
-            setPadding(0, 0, 0, 0)
-            isSingleLine = true
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PERSON_NAME or
-                InputType.TYPE_TEXT_FLAG_CAP_WORDS or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-            imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
-            filters = arrayOf(InputFilter.LengthFilter(NAME_MAX))
-            highlightColor = withAlpha(hue.color, 110)
-            textCursorDrawable = GradientDrawable().apply { setColor(hue.color); setSize(dp(9), dp(18)) } // a block, like the prompt's
-            setText(savedName().orEmpty())
-            setSelection(text.length)
-        }
-        fun refresh() {
-            val login = loginFor(field.text.toString())
-            preview.text = if (field.text.isBlank()) "empty: back to $DEFAULT_USER@tv and $DEFAULT_GREETING_NAME" else "shows as $login@tv"
-            terminal.type("~/system", "usermod -l $login $old", "done to save")
-        }
-        field.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: Editable?) = refresh()
-        })
-        field.setOnEditorActionListener { _, action, event ->
-            val done = action == EditorInfo.IME_ACTION_DONE ||
-                (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
-            if (done) saveName(field.text.toString())
-            done
-        }
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(12), 0, dp(12), 0)
-            addView(text(14f, color = DIM_WHITE).apply { text = "new name: " })
-            addView(field, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        }
-        showMenu(Folder.SYSTEM, "~/system/name", "", listOf(row, preview), focus = 0, animate = false)
-        editingName = true
-        redescribe = null
-        setLegend(listOf("OK" to "keyboard", "DONE" to "save", "BACK" to "cancel"))
-        refresh()
-        field.post {
-            field.requestFocus()
-            getSystemService(InputMethodManager::class.java).showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
-        }
+        openEditor(NAME_INDEX, "~/system/name", "new name: ", savedName().orEmpty(), NAME_MAX,
+            InputType.TYPE_TEXT_VARIATION_PERSON_NAME or InputType.TYPE_TEXT_FLAG_CAP_WORDS,
+            command = { "usermod -l ${loginFor(it)} $old" },
+            preview = { if (it.isBlank()) "empty: back to $DEFAULT_USER@tv and $DEFAULT_GREETING_NAME" else "shows as ${loginFor(it)}@tv" },
+            save = ::saveName)
     }
 
     /** Saves the name (empty resets it), prints the rename and its result, and goes back to the menu. */
@@ -541,6 +516,111 @@ class HomeActivity : Activity() {
         terminal.log("~/system", "usermod -l $login $old", if (name == null) "welcome back, $DEFAULT_GREETING_NAME" else "welcome, ${greetingName()}")
         terminal.user = login // from here on the prompt is theirs; the line above keeps the old one
         openMenu(Folder.SYSTEM, focus = NAME_INDEX, animate = false)
+    }
+
+    // ---- Weather city -------------------------------------------------------------------------
+
+    private fun savedPlace(): Place? {
+        val name = prefs.getString("place", null) ?: return null
+        return Place(name, prefs.getFloat("place_lat", 0f).toDouble(), prefs.getFloat("place_lon", 0f).toDouble(),
+            prefs.getBoolean("place_f", false))
+    }
+
+    /** system/ > weather: type a city; the terminal types the command that will look it up. */
+    private fun openCityEditor() {
+        openEditor(WEATHER_INDEX, "~/system/weather", "city: ", "", CITY_MAX, InputType.TYPE_TEXT_FLAG_CAP_WORDS,
+            command = { if (it.isBlank()) "weather --off" else "weather --city ${arg(it.trim())}" },
+            preview = { if (it.isBlank()) "empty: no weather on screen" else "searched with open-meteo.com" },
+            save = ::saveCity)
+    }
+
+    /** Looks the city up off the main thread, then prints what it found (or why not) and shows its weather. */
+    private fun saveCity(raw: String) {
+        val query = raw.trim()
+        openMenu(Folder.SYSTEM, focus = WEATHER_INDEX, animate = false)
+        if (query.isEmpty()) {
+            prefs.edit().remove("place").apply()
+            showWeather(null)
+            terminal.log("~/system", "weather --off", "weather: off")
+            return
+        }
+        val command = "weather --city ${arg(query)}"
+        net.execute {
+            val found = runCatching { Weather.find(query) }
+            root.post {
+                if (isDestroyed) return@post
+                val place = found.getOrElse { terminal.log("~/system", command, "weather: can't reach open-meteo.com"); return@post }
+                if (place == null) { terminal.log("~/system", command, "weather: no place called \"$query\""); return@post }
+                prefs.edit().putString("place", place.name).putFloat("place_lat", place.lat.toFloat())
+                    .putFloat("place_lon", place.lon.toFloat()).putBoolean("place_f", place.fahrenheit).apply()
+                terminal.log("~/system", command, "weather: ${place.name}")
+                showWeather(null)
+                refreshWeather()
+                openMenu(Folder.SYSTEM, focus = WEATHER_INDEX, animate = false) // its hint names the new city
+            }
+        }
+    }
+
+    // ---- One-line editor ----------------------------------------------------------------------
+
+    /**
+     * A one-line editor in the system/ menu's place, with the TV keyboard. As you type, the terminal
+     * types [command] for the text and the line under the field shows [preview]. Done (or Enter)
+     * calls [save]; Back returns to system/ entry [index].
+     */
+    private fun openEditor(index: Int, title: String, label: String, initial: String, max: Int, inputFlags: Int,
+                           command: (String) -> String, preview: (String) -> String, save: (String) -> Unit) {
+        val previewLine = text(12f, color = DIM_WHITE).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), 0, dp(12), 0)
+        }
+        val field = EditText(this).apply {
+            typeface = mono
+            textSize = 14f
+            setTextColor(Color.WHITE)
+            background = null
+            setPadding(0, 0, 0, 0)
+            isSingleLine = true
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS or inputFlags
+            imeOptions = EditorInfo.IME_ACTION_DONE or EditorInfo.IME_FLAG_NO_EXTRACT_UI
+            filters = arrayOf(InputFilter.LengthFilter(max))
+            highlightColor = withAlpha(hue.color, 110)
+            textCursorDrawable = GradientDrawable().apply { setColor(hue.color); setSize(dp(9), dp(18)) } // a block, like the prompt's
+            setText(initial)
+            setSelection(text.length)
+        }
+        fun refresh() {
+            val s = field.text.toString()
+            previewLine.text = preview(s)
+            terminal.type("~/system", command(s), "done to save")
+        }
+        field.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
+            override fun afterTextChanged(s: Editable?) = refresh()
+        })
+        field.setOnEditorActionListener { _, action, event ->
+            val done = action == EditorInfo.IME_ACTION_DONE ||
+                (event?.keyCode == KeyEvent.KEYCODE_ENTER && event.action == KeyEvent.ACTION_DOWN)
+            if (done) save(field.text.toString())
+            done
+        }
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(12), 0, dp(12), 0)
+            addView(text(14f, color = DIM_WHITE).apply { text = label })
+            addView(field, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        }
+        showMenu(Folder.SYSTEM, title, "", listOf(row, previewLine), focus = 0, animate = false)
+        editing = index
+        redescribe = null
+        setLegend(listOf("OK" to "keyboard", "DONE" to "save", "BACK" to "cancel"))
+        refresh()
+        field.post {
+            field.requestFocus()
+            getSystemService(InputMethodManager::class.java).showSoftInput(field, InputMethodManager.SHOW_IMPLICIT)
+        }
     }
 
     // ---- Favorites ----------------------------------------------------------------------------
@@ -621,6 +701,9 @@ class HomeActivity : Activity() {
             root.post {
                 if (isDestroyed) return@post
                 wallFront.animate().cancel()
+                // A cancelled fade never runs its end action: move the image it was fading in to the
+                // back, or the next fade would start over the scene before it.
+                (wallFront.drawable as? BitmapDrawable)?.bitmap?.let { wallBack.setImageBitmap(it) }
                 wallFront.setImageBitmap(bmp)
                 wallFront.alpha = 0f
                 wallFront.animate().alpha(1f).setDuration(fadeMs).withEndAction {
@@ -731,45 +814,64 @@ class HomeActivity : Activity() {
 
     private val weatherTick = Runnable { refreshWeather() }
 
-    /** Every 15 min while Home is on screen (and on coming back, if the last reading is older). Offline keeps the last one. */
+    /**
+     * Every 15 min while Home is on screen (and on coming back, if the last reading is older), for
+     * the city set in system/ > weather; none set, no weather. Offline keeps the last reading.
+     */
     private fun refreshWeather() {
         root.removeCallbacks(weatherTick)
+        val place = savedPlace() ?: return
         root.postDelayed(weatherTick, WEATHER_EVERY_MS)
         if (weather != null && SystemClock.elapsedRealtime() - weatherAt < WEATHER_EVERY_MS) return
         net.execute {
-            val reading = runCatching { Weather.fetch() }.getOrNull() ?: return@execute
-            root.post {
-                if (isDestroyed) return@post
-                weather = reading
-                weatherAt = SystemClock.elapsedRealtime()
-                weatherView.text = reading.toString()
-                updateClock()
-            }
+            val reading = runCatching { Weather.fetch(place) }.getOrNull() ?: return@execute
+            root.post { if (!isDestroyed && savedPlace() == place) showWeather(reading) }
         }
+    }
+
+    private fun showWeather(reading: Weather?) {
+        weather = reading
+        weatherAt = if (reading == null) 0L else SystemClock.elapsedRealtime()
+        weatherView.text = reading?.toString().orEmpty()
+        updateClock()
     }
 
     // ---- Apps ---------------------------------------------------------------------------------
 
+    /**
+     * Reads the TV's apps; runs on every return to Home (installs while Home was away) and on package
+     * broadcasts. Rebuilds only when the list really changed, so app updates in the background don't
+     * close a menu or move the cursor; an open apps/ menu is redrawn in place.
+     */
     private fun loadApps() {
-        // Other home screens (Glass, Play Home...) are left out: opening a launcher from a launcher only confuses.
+        // Other home screens are left out: opening a launcher from a launcher only confuses.
         val launchers = packageManager
             .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
             .map { it.activityInfo.packageName }.toSet()
-        allApps = packageManager
+        val apps = packageManager
             .queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER), 0)
             .filter { it.activityInfo.packageName !in launchers && it.activityInfo.packageName !in hiddenApps }
             .map { ri -> App(ri.activityInfo, ri.loadLabel(packageManager).toString()) }
             .sortedBy { it.label.lowercase() }
-        closeMenu(restoreFocus = false, animate = false) // its list may be out of date
+        if (appsLoaded && apps.map { it.key } == allApps.map { it.key }) return
+        appsLoaded = true
+        allApps = apps
+        val reopen = menuFolder == Folder.APPS
+        if (reopen) closeMenu(restoreFocus = false, animate = false)
         fillLine()
+        if (reopen) openMenu(Folder.APPS, animate = false)
     }
 
-    private fun launch(ai: ActivityInfo) {
+    /** Opens [app]; if it can't start (uninstalled since, disabled), says so in the terminal. */
+    private fun launch(app: App, dir: String) {
         val intent = Intent(Intent.ACTION_MAIN)
             .addCategory(Intent.CATEGORY_LEANBACK_LAUNCHER)
-            .setClassName(ai.packageName, ai.name)
+            .setClassName(app.info.packageName, app.info.name)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-        runCatching { startActivity(intent) }
+        runCatching { startActivity(intent) }.onFailure {
+            terminal.log(dir, "open ${arg(app.label)}", "open: can't start ${app.info.packageName}")
+            loadApps()
+        }
     }
 
     // ---- Lifecycle and keys -------------------------------------------------------------------
@@ -778,7 +880,11 @@ class HomeActivity : Activity() {
         override fun onReceive(c: Context, i: Intent) = updateClock()
     }
     private val packageReceiver = object : BroadcastReceiver() {
-        override fun onReceive(c: Context, i: Intent) = loadApps()
+        override fun onReceive(c: Context, i: Intent) {
+            // An update sends REMOVED then ADDED; mid-update the app can be missing, so wait for ADDED.
+            if (i.action == Intent.ACTION_PACKAGE_REMOVED && i.getBooleanExtra(Intent.EXTRA_REPLACING, false)) return
+            loadApps()
+        }
     }
 
     override fun onStart() {
@@ -795,6 +901,7 @@ class HomeActivity : Activity() {
             addAction(Intent.ACTION_PACKAGE_CHANGED)
             addDataScheme("package")
         })
+        loadApps() // the receiver only listens while Home is visible: catch installs made meanwhile
         rain.running = true
         nextScene() // a new scene every time you come back to Home
         startSession()
@@ -829,6 +936,8 @@ class HomeActivity : Activity() {
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         if (event.action == KeyEvent.ACTION_DOWN) restartIdle()
+        // Volume and media keys always reach the system, even over ambient or help.
+        if (event.keyCode in SYSTEM_KEYS) return super.dispatchKeyEvent(event)
         // In ambient any button just brings the home screen back; that press (down + up) does nothing else.
         if (inAmbient) {
             if (event.action == KeyEvent.ACTION_DOWN) { exitAmbient(); swallowKeyUp = true }
@@ -869,7 +978,7 @@ class HomeActivity : Activity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
             when {
-                editingName -> openMenu(Folder.SYSTEM, focus = NAME_INDEX, animate = false)
+                editing != null -> openMenu(Folder.SYSTEM, focus = editing!!, animate = false)
                 menu != null -> closeMenu()
                 else -> goHome()
             }

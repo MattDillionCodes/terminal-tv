@@ -1,12 +1,15 @@
 #!/bin/zsh
-# Build Matrix (R8-shrunk release), install it on the TCL and open it, for testing.
-# The TCL is a test device: Matrix is only ever an app opened there, never its Home. Installing a
-# second Home app can clear the TV's saved Home choice (and with the Google launcher disabled that
-# leaves a "choose a home app" picker), so whatever Home the TV had before is put back afterwards.
-# Usage: ./install-tv.sh            (TV=ip:port to override)
+# Build Matrix (R8-shrunk release), install it on a TV over adb and open it.
+# It's installed as an app you open, not made the TV's Home: installing a second Home app can clear
+# the TV's saved Home choice (leaving a "choose a home app" picker), so whatever Home the TV had
+# before is put back afterwards. To make Matrix the Home app, choose it in that picker or run
+#   adb shell cmd package set-home-activity com.matthew.matrixhome/.HomeActivity
+# Usage: ./install-tv.sh 192.168.1.20      (or TV=ip[:port]; enable ADB debugging on the TV first)
 set -e
-TV=${TV:-192.168.68.52:5555}
-ADB=${ADB:-$HOME/Library/Android/sdk/platform-tools/adb}
+TV=${1:-$TV}
+[ -n "$TV" ] || { echo "usage: $0 <tv-ip[:port]>"; exit 1; }
+[[ $TV == *:* ]] || TV=$TV:5555
+ADB=${ADB:-${ANDROID_HOME:-$HOME/Library/Android/sdk}/platform-tools/adb}
 export JAVA_HOME=${JAVA_HOME:-"/Applications/Android Studio.app/Contents/jbr/Contents/Home"}
 
 home() { $ADB shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME | tail -1 | tr -d '\r'; }

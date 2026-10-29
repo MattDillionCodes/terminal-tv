@@ -7,7 +7,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 
 /**
- * The code's character set, shared by the rain and the code tiles: Simon Whiteley's recipe of
+ * The code's character set, used by the rain: Simon Whiteley's recipe of
  * mirrored half-width katakana plus numerals and a few symbols.
  *
  * Glyphs are pre-rendered into ALPHA_8 atlases (one row of cells, white on transparent). An
