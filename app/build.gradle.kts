@@ -12,7 +12,18 @@ android {
         minSdk = 29 // Android TV 10: EditText.textCursorDrawable (the editor's block cursor) needs 29
         targetSdk = 35
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = "1.0.0"
+    }
+
+    val keystoreFile = rootProject.file("keystore.properties")
+    signingConfigs {
+        if (keystoreFile.exists()) create("release") {
+            val p = java.util.Properties().apply { keystoreFile.inputStream().use { load(it) } }
+            storeFile = file(p.getProperty("storeFile"))
+            storePassword = p.getProperty("storePassword")
+            keyAlias = p.getProperty("keyAlias")
+            keyPassword = p.getProperty("keyPassword")
+        }
     }
 
     buildTypes {
@@ -20,9 +31,8 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // Signed with the local debug key so `assembleRelease` installs without setup. Fine for
-            // sideloading your own TV; use your own key before handing the APK to anyone else.
-            signingConfig = signingConfigs.getByName("debug")
+            // Release key from keystore.properties when present (CI writes it); otherwise the local debug key.
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     packaging {
