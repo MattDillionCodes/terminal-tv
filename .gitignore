@@ -6,3 +6,18 @@ app/build/
 local.properties
 .idea/
 *.iml
+
+# Signing keys and secrets
+*.jks
+*.keystore
+*.p12
+keystore.properties
+.env
+.env.*
+
+# More IDE and build output
+.vscode/
+*.iws
+captures/
+.cxx/
+.externalNativeBuild/
